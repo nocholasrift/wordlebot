@@ -7,6 +7,9 @@
 #include <chrono>
 #include <array>
 #include <climits>
+#include <unordered_map>
+
+std::unordered_map<char, int> solution;
 
 enum GuessResult {
     DOES_NOT_EXIST = 0,
@@ -58,6 +61,8 @@ struct FiveLetterWord {
 };
 
 FiveLetterWord first_guess("ROATE");
+std::string answer;
+
 FiveLetterWord (*Strategy)(const std::vector<FiveLetterWord>&, const std::vector<FiveLetterWord>&, bool);
 
 typedef FiveLetterWord WordHint;
@@ -276,7 +281,12 @@ FiveLetterWord BestGuess_MinMax(const std::vector<FiveLetterWord>& possible_gues
         threads.push_back(std::thread([&, threadindex]() {
             for(int i = threadindex; i<possible_guesses.size(); i += nthreads) {
                 auto& guess = possible_guesses[i];
-                GuessRanking ranking = {0, 0, INT_MAX, i};
+
+                GuessRanking ranking;// = {0, 0, INT_MAX, i};
+                ranking.max_score = 0;
+                ranking.average_score = 0;
+                ranking.index = i;
+
 
                 for(int j = 0; j<possible_solutions.size(); j++) {
                     auto& actual = possible_solutions[j];
@@ -349,6 +359,27 @@ FiveLetterWord BestGuess(const std::vector<FiveLetterWord>& possible_guesses, co
     return Strategy(possible_guesses, possible_solutions, show_progress);
 }
 
+
+std::string generateHintResult(const std::string& guess){
+    std::string ret = "";
+    std::unordered_map<char, int> history;
+
+    for (int i = 0; i < 5; i++){
+        if (solution[guess[i]] && ( solution[guess[i]] > 1 || !history[guess[i]]) ){
+            if (guess[i] == answer[i])
+                ret += "g";
+            else
+                ret += "y";
+        } else  ret += "x";
+
+        history[guess[i]] = true;
+        
+    }
+
+    std::cout << ret << std::endl;
+    return ret;
+}
+
 void WordleBot(bool recompute_initial_guess = false) {
     std::vector<FiveLetterWord> all_words = LoadWordList("wordlist_guesses.txt");
     std::vector<FiveLetterWord> possible_words = LoadWordList("wordlist_solutions.txt");
@@ -360,10 +391,11 @@ void WordleBot(bool recompute_initial_guess = false) {
     bool solved = false;
 
     while(!solved) {
-        std::cout << "Guess: "+guess.to_s() << std::endl;
-        std::cout << "Enter Result: ";
-        std::string hintstr;
-        std::cin >> hintstr;
+
+        // std::cout << "Guess: "+guess.to_s() << std::endl;
+
+        std::string hintstr = generateHintResult(guess.to_s());
+
 
         if(hintstr.size() != 5) {
             std::cout << "error in hint, aborting" << std::endl;
@@ -374,19 +406,24 @@ void WordleBot(bool recompute_initial_guess = false) {
         possible_words = FilterWordList(hint, guess, possible_words);
 
         if(possible_words.size() == 0) {
-            std::cout << "impossible, no words left to guess" << std::endl;
+
+            // std::cout << "impossible, no words left to guess" << std::endl;
+            std::cout << "IMPOSSIBLE" << std::endl;
+
             break;
         }
 
 
-        std::cout << "Possible Words: ";
+
+        // std::cout << "Possible Words: ";
         for(auto word : possible_words) {
-            std::cout << word.to_s() << " ";
+            // std::cout << word.to_s() << " ";
         }
-        std::cout << std::endl;
+        // std::cout << std::endl;
 
         if(hint.is_correct()) {
-            std::cout << "You did it!" << std::endl;
+            // std::cout << "You did it!" << std::endl;
+            std::cout << "DONE" << std::endl;
             break;
         }
 
@@ -404,8 +441,8 @@ int WordleGame(FiveLetterWord solution, const std::vector<FiveLetterWord>& all_w
         if(output) std::cout << "Guess: " << guess.to_s() << std::endl;
         auto hint = evaluate_guess(guess, solution);
 
+        // if(output) std::cout << "Result: " << hint.to_squares() << std::endl;
 
-        if(output) std::cout << "Result: " << hint.to_squares() << std::endl;
         if(hint.is_correct()) break;
 
         if(guesses == 1) {
@@ -457,6 +494,13 @@ void WordleBenchmark() {
 }
 
 int main() {
+
+    // std::cout << "Please enter what the answer to today's wordle was. This is not used in the guess process at all: " << std::endl;
+    std::cin >> answer;
+
+    for (char c : answer)
+        solution[c]++;
+
     first_guess = FiveLetterWord("RAISE");
     Strategy = BestGuess_MinMax;
 
@@ -465,8 +509,9 @@ int main() {
 
     //first_guess = FiveLetterWord("SOARE");
     //Strategy = BestGuess_Simple;
-    
-    WordleBot(true);
+
+    WordleBot(false);
+
     //WordleBenchmark();
 
     //std::vector<FiveLetterWord> all_words = LoadWordList("wordlist_guesses.txt");
